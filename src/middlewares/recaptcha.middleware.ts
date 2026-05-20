@@ -1,5 +1,6 @@
 import { env } from "@config/env";
 import { ApiError } from "@utils/ApiError";
+import { logger } from "@utils/logger";
 import axios from "axios";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { StatusCodes } from "http-status-codes";
@@ -28,11 +29,12 @@ export const verifyRecaptcha: RequestHandler = async (
       body.recaptchaToken ??
       (req.headers["x-recaptcha-token"] as string | undefined);
 
+    if (env.NODE_ENV !== "production") {
+      logger.log("Development mode: bypassing reCAPTCHA verification.");
+      return next();
+    }
+
     if (!token) {
-      if (env.NODE_ENV !== "production") {
-        console.warn("reCAPTCHA token missing — bypassing verification in development mode.");
-        return next();
-      }
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         "reCAPTCHA token is required",
