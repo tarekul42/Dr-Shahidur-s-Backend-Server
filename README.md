@@ -1,411 +1,228 @@
-# Dr. Md. Sahidur Rahman Khan — Personal Web Platform (Backend API)
+# Dr. Shahidur Rahman Khan's Platform — Backend
 
-> Production-grade, scalable, and secure REST API built with **Node.js**, **Express**, **TypeScript**, and **MongoDB**. Serves two independent frontends — a public-facing Next.js website and a Vite + React admin dashboard.
+> A production-grade REST API serving **two independent frontends** (public Next.js site + admin dashboard) for Dr. Md. Shahidur Rahman Khan, Associate Professor at NITOR, Dhaka. Built with **Express 5**, **TypeScript**, and **MongoDB**. Features **multi-channel notifications (Email + WhatsApp + Telegram)**, magic-link auth, audit trails, and 14 modular modules. Built as a **team project (2 developers)**.
 
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Modules & API Endpoints](#modules--api-endpoints)
-- [Environment Variables](#environment-variables)
-- [Getting Started](#getting-started)
-- [Scripts](#scripts)
-- [Authentication Flow](#authentication-flow)
-- [Role & Permission System](#role--permission-system)
-- [File Upload Strategy](#file-upload-strategy)
-- [Notification System](#notification-system)
-- [Analytics System](#analytics-system)
-- [Universal Search](#universal-search)
-- [Activity Logging](#activity-logging)
-- [Security](#security)
-- [Response Format](#response-format)
-- [Email Templates](#email-templates)
-- [Rate Limiting](#rate-limiting)
-- [Deployment Notes](#deployment-notes)
+[![Frontend Repo](https://img.shields.io/badge/Frontend_Repo-GitHub-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/tarekul42/Dr-Shahidur-s-Portfolio-frontend)
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg?style=flat-square)](https://opensource.org/licenses/ISC)
 
 ---
 
-## Overview
+## 📋 Overview
 
-This backend API powers the personal web platform of **Dr. Md. Sahidur Rahman Khan**, Associate Professor of Orthopedic & Trauma Surgery at NITOR, Dhaka. The platform covers his professional identity as a doctor, researcher, and public figure.
+This is the backend API for **Dr. Md. Shahidur Rahman Khan's** professional platform — a real client deliverable for an Associate Professor of Orthopedic & Trauma Surgery at the **National Institute of Traumatology and Orthopaedic Rehabilitation (NITOR), Dhaka**. The API serves **two independent frontends** from a single codebase: a public-facing Next.js website (for patients/visitors) and a Vite + React admin dashboard (for the doctor and his team).
 
-The API is a single unified backend that feeds:
+This was a **team project (2 developers)**. My contributions focused on the **multi-channel notification system** (Email + WhatsApp + Telegram), **magic-link authentication**, **decoupled file upload strategy**, **Redis JTI blacklist for refresh-token invalidation**, and the **activity-log middleware**.
 
-| Frontend        | Domain                 | Framework                 |
-| --------------- | ---------------------- | ------------------------- |
-| Public Website  | `www.domain.com`       | Next.js + TypeScript      |
-| Admin Dashboard | `dashboard.domain.com` | Vite + React + TypeScript |
+The API follows a strict **MVC architecture** (Model → Service → Controller → Routes) across 14 modules: `auth`, `users`, `appointment`, `article`, `research`, `testimonial`, `Chembers`, `contact`, `upload`, `search`, `analytics`, `activity-log`, `app-info`, `visitor`.
 
 ---
 
-## Architecture
+## 🛠️ Tech Stack
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                       SINGLE BACKEND API                         │
-│              Node.js + Express + TypeScript + MongoDB            │
-│                       api.domain.com                             │
-└──────────────────────┬──────────────────────┬───────────────────┘
-                       │                      │
-         ┌─────────────▼──────┐   ┌───────────▼────────────┐
-         │   PUBLIC FRONTEND   │   │   DASHBOARD FRONTEND   │
-         │     (Next.js)       │   │    (Vite + React)      │
-         │   www.domain.com    │   │  dashboard.domain.com  │
-         └────────────────────┘   └────────────────────────┘
-```
-
-**Design pattern:** MVC (Model → Service → Controller → Routes)
-
-```
-Request → Route → Validator → Auth Middleware → Role Middleware
-       → Activity Log Middleware → Controller → Service → Model
-       → Response
-```
+| Category | Technology |
+|----------|-----------|
+| Runtime | Node.js (with ts-node-dev) |
+| Framework | Express.js 5 |
+| Language | TypeScript 6 |
+| Database | MongoDB (Mongoose 9) |
+| Cache | Redis (ioredis) |
+| Auth | JWT (access + refresh rotation) + bcrypt (salt 12) |
+| Validation | express-validator + Zod |
+| Logging | Morgan + chalk |
+| File Storage | ImageKit (images + PDFs) + Cloudinary (videos) |
+| Email | Nodemailer + Brevo (@getbrevo/brevo) |
+| WhatsApp | whatsapp-web.js |
+| Telegram | node-telegram-bot-api |
+| Real-time | Socket.io |
+| Security | Helmet, hpp, cors, express-rate-limit, lusca, xss |
+| Pagination | mongoose-paginate-v2 |
+| Misc | slugify, dayjs, ua-parser-js, uuid, qrcode-terminal, compression, connect-timeout |
 
 ---
 
-## Tech Stack
+## ✨ Main Features
 
-### Runtime & Framework
-
-| Package      | Purpose                                |
-| ------------ | -------------------------------------- |
-| `node.js`    | Runtime                                |
-| `express`    | HTTP framework                         |
-| `typescript` | Type safety across the entire codebase |
-| `mongoose`   | MongoDB ODM                            |
-| `zod`        | Environment variable schema validation |
-
-### Auth & Security
-
-| Package                  | Purpose                            |
-| ------------------------ | ---------------------------------- |
-| `jsonwebtoken`           | Access + refresh token generation  |
-| `bcrypt`                 | Password hashing (salt rounds: 12) |
-| `helmet`                 | HTTP security headers + CSP        |
-| `cors`                   | Strict origin whitelisting         |
-| `express-rate-limit`     | Per-route rate limiting            |
-| `express-mongo-sanitize` | NoSQL injection prevention         |
-| `xss`                    | HTML sanitization                  |
-| `cookie-parser`          | HttpOnly refresh token cookies     |
-| `uuid`                   | OTP + magic token generation       |
-
-### File Handling
-
-| Package            | Purpose                           |
-| ------------------ | --------------------------------- |
-| `multer`           | Multipart upload middleware       |
-| `@imagekit/nodejs` | Image and PDF storage             |
-| `cloudinary`       | Video storage (testimonials only) |
-
-### Notifications
-
-| Package                 | Purpose                        |
-| ----------------------- | ------------------------------ |
-| `nodemailer`            | Transactional email            |
-| `whatsapp-web.js`       | WhatsApp alerts to the doctor  |
-| `node-telegram-bot-api` | Telegram contact notifications |
-
-### Utilities
-
-| Package                | Purpose                                |
-| ---------------------- | -------------------------------------- |
-| `dayjs`                | Date formatting                        |
-| `axios`                | HTTP calls (reCAPTCHA, geolocation)    |
-| `slugify`              | URL slug generation (Bangla + English) |
-| `mongoose-paginate-v2` | Cursor-based pagination                |
-| `compression`          | Gzip response compression              |
-| `morgan`               | HTTP request logging                   |
-| `chalk@4.1.2`          | Dev console colorization               |
+- **Multi-channel notification system** — when a visitor submits the contact form or books an appointment, the doctor is notified via **Email (Nodemailer/Brevo)**, **WhatsApp (whatsapp-web.js → his phone)**, and **Telegram (node-telegram-bot-api → channel)**. The WhatsApp integration runs a headless Chromium with persistent session storage and reconnection logic.
+- **Magic-link authentication** — one-click login via email. The doctor doesn't need to remember a password — he clicks a link in his email and is logged in.
+- **Decoupled file upload strategy** — frontend pre-uploads files to `/api/v1/upload`, gets back `{url, fileId}`, then attaches as JSON to entity endpoints. Keeps entity payloads strictly JSON, simplifies validation, and lets the frontend show upload progress independently.
+- **Single backend, two frontends** — one API serves both the public Next.js site (`CLIENT_PUBLIC_URL`) and the admin dashboard (`CLIENT_DASHBOARD_URL`) with strict CORS whitelist per origin.
+- **Redis JTI blacklist** — refresh tokens are invalidated immediately on logout via a Redis-backed JTI blacklist. No "logged out but token still works for 7 days" problem.
+- **14 modular modules** — `auth`, `users`, `appointment`, `article`, `research`, `testimonial`, `Chembers`, `contact`, `upload`, `search`, `analytics`, `activity-log`, `app-info`, `visitor`
+- **Activity-log middleware** — every protected route logs the action (who, what, when, IP, user-agent) for accountability
+- **Bilingual slugify** — article and research titles in Bangla + English get SEO-friendly slugs
+- **6 custom email templates** — OTP, magic-login, moderator-invite, appointment-confirmation, contact-confirmation, password-changed
+- **Universal search** — searches across articles, research, and testimonials with type filter + result limit
+- **Analytics** — page views (fire-and-forget), grouped by route, locations by country/city (via ua-parser-js)
+- **Rate limiting** — Redis-backed rate limits for auth, search, and tracking endpoints
 
 ---
 
-## Project Structure
+## 📦 Main Dependencies
 
-```
-/
-├── src/
-│   ├── modules/
-│   │   ├── auth/
-│   │   ├── analytics/
-│   │   ├── appointment/
-│   │   ├── article/
-│   │   ├── research/
-│   │   ├── testimonial/
-│   │   ├── activity-log/
-│   │   ├── app-info/
-│   │   ├── search/
-│   │   ├── contact/
-│   │   ├── upload/
-│   │   └── users/
-│   ├── middlewares/
-│   ├── config/
-│   ├── utils/
-│   ├── emails/
-│   ├── constants/
-│   ├── types/
-│   └── app.ts
-├── server.ts
-├── tsconfig.json
-├── .env
-├── package.json
-└── README.md
-```
+### Runtime Dependencies
+| Package | Purpose |
+|---------|---------|
+| `express@^5.2.1` | Web framework |
+| `mongoose@^9.6.2` + `mongoose-paginate-v2@^1.9.4` | MongoDB ODM + pagination |
+| `ioredis@^5.10.1` + `rate-limit-redis@^4.3.1` | Redis client + Redis-backed rate limits |
+| `jsonwebtoken@^9.0.3` | JWT auth (access + refresh rotation) |
+| `bcrypt@^6.0.0` | Password hashing (salt 12) |
+| `uuid@^14.0.0` | OTP + magic-token generation |
+| `nodemailer@^8.0.7` + `@getbrevo/brevo@^5.0.4` | Email (dual providers) |
+| `whatsapp-web.js@^1.34.7` + `qrcode-terminal@^0.12.0` | WhatsApp alerts to doctor's phone (QR login in terminal) |
+| `node-telegram-bot-api@^0.67.0` | Telegram contact notifications |
+| `socket.io@^4.8.3` | Real-time (present, partially wired) |
+| `multer@^2.1.1` | File uploads |
+| `@imagekit/nodejs@^7.6.1` | Image + PDF storage |
+| `cloudinary@^2.10.0` | Video storage (testimonials) |
+| `express-validator@^7.3.2` + `zod@^4.4.3` | Request validation |
+| `helmet@^8.1.0` + `hpp@^0.2.3` + `lusca@^1.7.0` + `xss@^1.0.15` | Security headers + XSS protection |
+| `express-rate-limit@^8.5.2` | Rate limiting |
+| `cookie-parser@^1.4.7` + `compression@^1.8.1` + `connect-timeout@^1.9.1` | Production middleware |
+| `cors@^2.8.6` | Cross-origin (strict whitelist per frontend) |
+| `slugify@^1.6.9` | Bilingual (Bangla + English) slugs |
+| `ua-parser-js@^2.0.9` | User-agent parsing for analytics |
+| `morgan@^1.10.1` + `chalk@^4.1.2` | HTTP logging |
+| `dayjs@^1.11.20` | Date utilities |
+| `axios@^1.16.1` | HTTP client (for external APIs) |
+| `http-status-codes@^2.3.0` | HTTP status constants |
+| `events@^3.3.0` | Event-driven patterns |
 
----
-
-## Modules & API Endpoints
-
-### Auth — `/api/v1/auth`
-
-| Method | Endpoint           | Access    | Description                      |
-| ------ | ------------------ | --------- | -------------------------------- |
-| POST   | `/login`           | Public    | Email + password login           |
-| POST   | `/forgot-password` | Public    | Send OTP + magic link via email  |
-| POST   | `/verify-otp`      | Public    | Verify 6-digit OTP               |
-| POST   | `/magic-login`     | Public    | One-click login via magic token  |
-| POST   | `/reset-password`  | Public    | Set new password via magic token |
-| POST   | `/refresh-token`   | Public    | Rotate refresh token from cookie |
-| POST   | `/logout`          | Protected | Clear refresh token cookie       |
+### Dev Dependencies (key ones)
+| Package | Purpose |
+|---------|---------|
+| `typescript@^6.0.3` | Type safety |
+| `ts-node-dev@^2.0.0` + `tsconfig-paths@^4.2.0` | Dev server with path aliases |
+| `eslint@^10.4.0` + `typescript-eslint@^8.59.4` | Linting |
+| `@types/*` | Type definitions for all runtime deps |
 
 ---
 
-### Users — `/api/v1/users`
+## 🚀 Run Locally
 
-| Method | Endpoint             | Access     | Description                     |
-| ------ | -------------------- | ---------- | ------------------------------- |
-| GET    | `/me`                | Protected  | Get own profile                 |
-| PATCH  | `/me`                | Protected  | Update own profile              |
-| PATCH  | `/me/password`       | Protected  | Change password (with verification) |
-| GET    | `/`                  | Admin only | List all users                  |
-| POST   | `/invite`            | Admin only | Invite moderator via email      |
-| PATCH  | `/:id/toggle-active` | Admin only | Activate/deactivate user        |
-| DELETE | `/:id`               | Admin only | Delete user                     |
-
----
-
-### Analytics — `/api/v1/analytics`
-
-| Method | Endpoint              | Access    | Description                       |
-| ------ | --------------------- | --------- | --------------------------------- |
-| POST   | `/track`              | Public    | Track page view (fire-and-forget) |
-| GET    | `/pages`              | Admin/Mod | Page views grouped by route       |
-| GET    | `/locations`          | Admin/Mod | Visitors grouped by country/city  |
-
----
-
-### Appointments — `/api/v1/appointments`
-
-| Method | Endpoint      | Access    | Description                            |
-| ------ | ------------- | --------- | -------------------------------------- |
-| POST   | `/`           | Public    | Submit appointment (reCAPTCHA v3)      |
-| GET    | `/`           | Admin/Mod | All appointments, paginated + filtered |
-| GET    | `/charts`     | Admin/Mod | Chart data (daily/monthly/all-time)    |
-| GET    | `/:id`        | Admin/Mod | Single appointment details             |
-| PATCH  | `/:id/status` | Admin/Mod | Confirm or cancel                      |
-
----
-
-### Articles — `/api/v1/articles`
-
-| Method | Endpoint          | Access     | Description                                |
-| ------ | ----------------- | ---------- | ------------------------------------------ |
-| GET    | `/categories`     | Public     | All article categories                     |
-| POST   | `/categories`     | Admin/Mod  | Create category                            |
-| PATCH  | `/categories/:id` | Admin/Mod  | Update category                            |
-| DELETE | `/categories/:id` | Admin only | Delete category                            |
-| GET    | `/`               | Public     | All published articles (filter + paginate) |
-| GET    | `/:slug`          | Public     | Single article + impression increment      |
-| POST   | `/`               | Admin/Mod  | Create article (TipTap HTML)               |
-| PATCH  | `/:id`            | Admin/Mod  | Update article                             |
-| DELETE | `/:id`            | Admin only | Delete article                             |
-
----
-
-### Research — `/api/v1/research`
-
-| Method | Endpoint | Access     | Description                                |
-| ------ | -------- | ---------- | ------------------------------------------ |
-| GET    | `/`      | Public     | All published research (filter + paginate) |
-| GET    | `/:slug` | Public     | Single research paper                      |
-| POST   | `/`      | Admin/Mod  | Add research (PDF upload or DOI link)      |
-| PATCH  | `/:id`   | Admin/Mod  | Update research                            |
-| DELETE | `/:id`   | Admin only | Delete research                            |
-
----
-
-### Testimonials — `/api/v1/testimonials`
-
-| Method | Endpoint | Access     | Description                              |
-| ------ | -------- | ---------- | ---------------------------------------- |
-| GET    | `/`      | Public     | All visible testimonials                 |
-| POST   | `/`      | Admin/Mod  | Create testimonial                       |
-| PATCH  | `/:id`   | Admin/Mod  | Update testimonial                       |
-| DELETE | `/:id`   | Admin only | Delete testimonial                       |
-
----
-
-### Activity Logs — `/api/v1/activity-logs`
-
-| Method | Endpoint    | Access    | Description                           |
-| ------ | ----------- | --------- | ------------------------------------- |
-| GET    | `/`         | Admin/Mod | All logs (Admin) or own logs (Mod)    |
-| DELETE | `/:id`      | Admin/Mod | Delete single log                     |
-| DELETE | `/bulk`     | Admin/Mod | Bulk delete by IDs                    |
-
----
-
-### Contact — `/api/v1/contact`
-
-| Method | Endpoint    | Access     | Description                        |
-| ------ | ----------- | ---------- | ---------------------------------- |
-| POST   | `/`         | Public     | Submit message (reCAPTCHA v3)      |
-| GET    | `/`         | Admin/Mod  | All messages, paginated + filtered |
-| PATCH  | `/:id/read` | Admin/Mod  | Mark message as read               |
-| DELETE | `/:id`      | Admin only | Delete message                     |
-
----
-
-### Universal Search — `/api/v1/search`
-
-| Method | Endpoint            | Access | Description                             |
-| ------ | ------------------- | ------ | --------------------------------------- |
-| GET    | `/?q=&type=&limit=` | Public | Search articles, research, testimonials |
-
----
-
-### Uploads — `/api/v1/upload`
-
-| Method | Endpoint | Access     | Description                                |
-| ------ | -------- | ---------- | ------------------------------------------ |
-| POST   | `/image` | Admin/Mod  | Upload single image to ImageKit            |
-| POST   | `/pdf`   | Admin/Mod  | Upload single PDF to ImageKit              |
-| POST   | `/video` | Admin/Mod  | Upload single video                        |
-
----
-
-## File Upload Strategy
-
-We use a **decoupled upload strategy** via a dedicated `POST /api/v1/upload` endpoint. 
-Instead of handling raw `multipart/form-data` during entity creation (Articles, Research, Testimonials), the frontend pre-uploads the files to the upload endpoints. The API responds with a structured `{ url, fileId }` object, which the frontend then attaches as JSON to the entity endpoints. This keeps entity payloads strictly JSON and significantly simplifies validation and service logic.
-
----
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and fill in every value.
-
-```env
-# SERVER
-PORT=5000
-NODE_ENV=development
-
-# DATABASE
-MONGO_URI=mongodb+srv://...
-
-# REDIS
-REDIS_URL=redis://localhost:6379
-
-# JWT
-JWT_ACCESS_SECRET=...
-JWT_REFRESH_SECRET=...
-JWT_ACCESS_EXPIRY=15m
-JWT_REFRESH_EXPIRY=7d
-
-# IMAGEKIT
-IMAGEKIT_PUBLIC_KEY=...
-IMAGEKIT_PRIVATE_KEY=...
-IMAGEKIT_URL_ENDPOINT=...
-
-# CLOUDINARY
-CLOUDINARY_CLOUD_NAME=...
-CLOUDINARY_API_KEY=...
-CLOUDINARY_API_SECRET=...
-
-# EMAIL
-SMTP_HOST=...
-SMTP_PORT=...
-SMTP_USER=...
-SMTP_PASS=...
-
-# WHATSAPP
-DOCTOR_WHATSAPP_NUMBER=880...
-WHATSAPP_SESSION_PATH=./whatsapp-session
-
-# TELEGRAM
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
-```
-
----
-
-## Getting Started
+### Prerequisites
+- [Node.js](https://nodejs.org/) 18+ (with npm)
+- [MongoDB](https://www.mongodb.com/try/download/community) running locally, or MongoDB Atlas
+- [Redis](https://redis.io/download/) running locally, or Upstash/Redis Cloud
+- ImageKit account (free) — for image + PDF uploads
+- Cloudinary account (free) — for video uploads
+- Brevo account (free) — for transactional email
+- Telegram Bot token (free) — via [@BotFather](https://t.me/BotFather)
+- Google reCAPTCHA v3 keys (free)
 
 ### Installation
 
 ```bash
-# 1. Install dependencies
-bun install
+# 1. Clone
+git clone https://github.com/tarekul42/Dr-Shahidur-s-Backend-Server.git
+cd Dr-Shahidur-s-Backend-Server
 
-# 2. Set up environment variables
+# 2. Install dependencies
+npm install
+
+# 3. Configure environment
 cp .env.example .env
+# Edit .env — see required variables below
 
-# 3. Start development server
-bun run dev
+# 4. Run dev server (with hot reload via ts-node-dev)
+npm run dev
 ```
 
+Server starts at http://localhost:5000
+
+### Environment Variables (required)
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `PORT` | Server port | `5000` |
+| `NODE_ENV` | Environment | `development` |
+| `MONGO_URI` | MongoDB connection string | `mongodb://localhost:27017/dr-shahidur` |
+| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
+| `JWT_ACCESS_SECRET` | Access token secret (min 32 chars) | `openssl rand -base64 32` |
+| `JWT_REFRESH_SECRET` | Refresh token secret | (generate like above) |
+| `JWT_ACCESS_EXPIRY` | Access token lifetime | `15m` |
+| `JWT_REFRESH_EXPIRY` | Refresh token lifetime | `7d` |
+| `CLIENT_PUBLIC_URL` | Public frontend URL (CORS) | `http://localhost:3000` |
+| `CLIENT_DASHBOARD_URL` | Admin dashboard URL (CORS) | `http://localhost:3001` |
+| `IMAGEKIT_PUBLIC_KEY` | ImageKit public key | (from ImageKit dashboard) |
+| `IMAGEKIT_PRIVATE_KEY` | ImageKit private key | (from ImageKit dashboard) |
+| `IMAGEKIT_URL_ENDPOINT` | ImageKit URL endpoint | `https://ik.imagekit.io/your_id` |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | (from Cloudinary dashboard) |
+| `CLOUDINARY_API_KEY` | Cloudinary API key | (from Cloudinary dashboard) |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret | (from Cloudinary dashboard) |
+| `SMTP_HOST` | SMTP host | `smtp-relay.brevo.com` |
+| `SMTP_PORT` | SMTP port | `587` |
+| `SMTP_USER` | SMTP user | `your_email@example.com` |
+| `SMTP_PASS` | SMTP password | (Brevo SMTP key) |
+| `SMTP_FROM_NAME` | From name | `Dr. Shahidur Rahman Khan` |
+| `SMTP_FROM_EMAIL` | From email | `noreply@example.com` |
+| `RECAPTCHA_V3_SECRET` | reCAPTCHA v3 secret | (from Google reCAPTCHA admin) |
+| `DOCTOR_WHATSAPP_NUMBER` | Doctor's WhatsApp number | `8801XXXXXXXXX` |
+| `WHATSAPP_SESSION_PATH` | WhatsApp session storage path | `./whatsapp-session` |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token | (from @BotFather) |
+| `TELEGRAM_CHAT_ID` | Telegram channel/chat ID | (from Telegram) |
+| `ADMIN_SEED_EMAIL` | Admin seed email | `admin@example.com` |
+| `ADMIN_SEED_PASSWORD` | Admin seed password | `your_admin_password` |
+| `TEMP_PASS` | Temporary password for seeded users | `your_temp_password` |
+| `BREVO_API_KEY` | Brevo API key | (from Brevo dashboard) |
+
+### Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server with hot reload (ts-node-dev) |
+| `npm run build` | TypeScript compile |
+| `npm start` | Start server (same as dev for now) |
+| `npm run type-check` | TypeScript compiler check |
+| `npm run lint` | Run ESLint |
+| `npm run lint:fix` | Run ESLint with auto-fix |
+
+### WhatsApp Setup
+
+On first server start, a QR code will appear in the terminal. Scan it with the doctor's WhatsApp:
+1. Open WhatsApp on the doctor's phone
+2. Go to **Settings → Linked Devices → Link a Device**
+3. Scan the QR code in the terminal
+
+After that, the session is persistent (stored at `WHATSAPP_SESSION_PATH`). The bot will send contact form submissions and appointment bookings directly to the doctor's WhatsApp.
+
 ---
 
-## Scripts
+## 👥 Team
 
-| Script      | Command                                                                 | Description                                    |
-| ----------- | ----------------------------------------------------------------------- | ---------------------------------------------- |
-| Development | `bun run dev`                                                           | Start with auto-restart + path alias resolution |
-| Build       | `bun run build`                                                         | Compile TypeScript to `dist/`                  |
-| Production  | `bun start`                                                             | Run compiled JS with path alias resolution     |
-| Type Check  | `bun run type-check`                                                    | Full TypeScript check, no emit                 |
+This was a **team project with 2 developers**. My contributions to the backend:
 
----
-
-## Security
-
-- **Password Hashing**: bcrypt (salt rounds: 12)
-- **Token Security**: JWT Access + Refresh token rotation
-- **Redis Blacklisting**: Refresh tokens invalidated on logout via Redis JTI blacklist
-- **Sanitization**: `express-mongo-sanitize` + `xss` globally applied
-- **Rate Limiting**: Redis-backed limits for auth, search, and tracking
-- **CORS**: Strict whitelist for public and dashboard domains
+* **Full authentication module** — Redis-backed OTP & magic-link authentication, forgot/reset password flow, refresh-token management, and logout invalidation
+* **Rate-limiting infrastructure** — global and per-route throttling to protect APIs from abuse and excessive traffic
+* **Appointment management system** — complete CRUD operations, status workflows, analytics aggregation, and validation
+* **Content management modules** — Articles, Research, and Testimonials with caching, validation, search optimization, and asset lifecycle handling
+* **Activity logging & auditing** — centralized middleware across protected routes with admin controls and automated retention policies
+* **Email communication system** — 6 custom transactional email templates for authentication, invitations, appointments, and account events
+* **Security & DevOps improvements** — CSRF protection, input sanitization, structured logging, GitHub Actions CI/CD, and CodeQL security remediation
 
 ---
 
-## Email Templates
+## 🔗 Links
 
-| Template                               | Trigger                | Recipient       |
-| -------------------------------------- | ---------------------- | --------------- |
-| `otp-email.template.ts`                | Forgot password        | Admin/Moderator |
-| `magic-login.template.ts`              | Magic login link       | Admin/Moderator |
-| `moderator-invite.template.ts`         | New moderator created  | New moderator   |
-| `appointment-confirmation.template.ts` | Appointment submitted  | Patient         |
-| `contact-confirmation.template.ts`     | Contact form submitted | Visitor         |
-| `password-changed.template.ts`         | Password reset success | User            |
+| Resource | URL |
+|----------|-----|
+| 🌐 **Live Frontend** | https://drshahidurrahman.vercel.app |
+| 💻 **Frontend Repo** | https://github.com/tarekul42/Dr-Shahidur-s-Portfolio-frontend |
+| 👨‍⚕️ **Client** | Dr. Md. Shahidur Rahman Khan, Associate Professor, NITOR Dhaka |
+| 📧 **Contact** | tarekulrifat142@gmail.com |
 
 ---
 
-## Deployment Notes
+## 📄 License
 
-### Production Run
-
-```bash
-bun run build
-bun start
-```
+ISC © Tarekul Islam Rifat
 
 ---
 
-## License
+<div align="center">
 
-Private & Confidential. All rights reserved. Proprietary codebase.
+**⭐ If this project helped you, give it a star!**
+
+Built by [Tarekul Islam Rifat](https://github.com/tarekul42) + team
+
+</div>
